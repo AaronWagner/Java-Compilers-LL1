@@ -1,0 +1,12 @@
+expression -> var = expression | simple-expression 
+var -> ID | ID [ expression ]
+simple-expression -> additive-expression relop additive-expression | additive-expression
+relop -> <= | < | > | >= | == | !=
+additive-expression -> additive-expression addop term | term
+addop -> + | -
+term -> term mulop factor | factor
+mulop -> * | /
+factor -> ( expression ) | var | call | num
+call -> id ( args )
+args -> arg-list | @
+arg-list -> arg-list , expression | expression
