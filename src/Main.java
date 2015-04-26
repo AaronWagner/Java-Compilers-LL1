@@ -3,6 +3,7 @@ import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,9 +27,11 @@ public class Main {
     Matcher arrowMatcher;
     Matcher nextWordMatcher;
 
-    ArrayList<String> terminals;
-    ArrayList<String> nonterminals;
 
+    HashMap <String, RuleOutput> terminals;
+    //ArrayList<String> terminalNames;
+    HashMap <String, RuleOutput> nonterminals;
+    //ArrayList<String> nonTerminalNames;
 
 
     class Rule
@@ -39,8 +42,9 @@ public class Main {
         ArrayList<RuleOutput> rightHandSideList;
         boolean unreachable;
         boolean hasEmpty;
-        ArrayList<String> firsts;
-        ArrayList<String> follows;
+        HashMap<String, String> firsts;
+
+        HashMap<String, String> follows;
 
         public Rule(String inputLeftSide, ArrayList<RuleOutput> inputRightSideList) {
             leftHandSide = new String(inputLeftSide);
@@ -48,18 +52,26 @@ public class Main {
                 rightHandSideList.add(inputRightSideList.get(i));
             }
             unreachable = false;
+            firsts= new HashMap<String, String>();
+
+            follows= new HashMap<String, String>();
         }
 
         public Rule() {
             String leftHandSide = new String();
             ArrayList<RuleOutput> rightHandSideList = new ArrayList<RuleOutput>();
             unreachable = false;
+            firsts= new HashMap<String, String>();
+
+            follows= new HashMap<String, String>();
         }
 
         public Rule(String input) {
             String leftHandSide = new String(input);
             ArrayList<RuleOutput> rightHandSideList = new ArrayList<RuleOutput>();
             unreachable = false;
+            firsts= new HashMap<String, String>();
+            follows= new HashMap<String, String>();
         }
 
         public String getLeftHandSide() {
@@ -325,35 +337,133 @@ public class Main {
             return output;
         }
 
+        public void findFirst()
+        {
+            terminals=new HashMap<String, RuleOutput>();
+            nonterminals=new HashMap<String, RuleOutput>();
+            for (Rule aRule: theGrammer)
+            {
+                for (RuleOutput aOutputList: aRule.rightHandSideList)
+                {
+                    for (String aOutput: aOutputList)
+                    {
+                        RuleOutput addedOutput=new RuleOutput();
+                        addedOutput.add(aOutput.trim());
+                        addedOutput.first=new HashMap<String, String>();
+                        addedOutput.follows=new HashMap<String, String>();
+                        if (terminals.get(aOutput.trim())==null)
+                        {
+                            terminals.put(aOutput.trim(), addedOutput);
+                        }
+                    }
+                }
+            }
+            //take the nonterminals out of the terminal list
+            for (Rule aRule: theGrammer)
+            {
+                if(null==terminals.remove(aRule.leftHandSide.trim()))
+                {
+                    System.out.print("\n Error Removing "+aRule.leftHandSide.trim()+" from terminals.");
+                }
+                RuleOutput addedOutput=new RuleOutput();
+                addedOutput.add(aRule.leftHandSide.trim());
+                addedOutput.first=new HashMap<String, String>();
+                addedOutput.follows=new HashMap<String, String>();
+                nonterminals.put(aRule.leftHandSide.trim(), addedOutput);
+            }
+
+        }
+
 
         public void findFirsts()
         {
-            terminals=new ArrayList<String>();
-            nonterminals=new ArrayList<String>();
-
+            terminals=new HashMap<String, RuleOutput>();
+            nonterminals=new HashMap<String, RuleOutput>();
+            //nonTerminalNames=new ArrayList<String>();
+            //terminalNames=new ArrayList<String>();
             //all nonterminals have a production rule
-            for (int i=0; i<theGrammer.size(); i++)
+            for (int i=0; i<theGrammer.size()-1; i++)
             {
                 if (!theGrammer.get(i).unreachable)
                 {
-                    nonterminals.add(theGrammer.get(i).leftHandSide);
-
+                    RuleOutput aNonterminal=new RuleOutput();
+                    aNonterminal.add(theGrammer.get(i).leftHandSide);
+                    nonterminals.put(theGrammer.get(i).leftHandSide, aNonterminal);
+                    //nonTerminalNames.add(theGrammer.get(i).leftHandSide);
                 }
             }
             //terminals are not on the left hadn side of a rule
-            for (int i=0; i<theGrammer.size(); i++)
+            for (int i=0; i<theGrammer.size()-1; i++)
             {
                 for (int j=0; j<theGrammer.get(i).rightHandSideList.size(); j++)
                 {
                     for (int k=0; k<theGrammer.get(i).rightHandSideList.get(j).size();k++)
                     {
                         String possibleTerminal=theGrammer.get(i).rightHandSideList.get(j).get(k);
-                        if (!nonterminals.contains(possibleTerminal)&&possibleTerminal!="@")
+                        if ((nonterminals.get(possibleTerminal)==null)||possibleTerminal!="@")
                         {
-                            terminals.add(possibleTerminal);
+                            RuleOutput aTerminal=new RuleOutput();
+                            aTerminal.add(possibleTerminal);
+                            terminals.put(possibleTerminal, aTerminal);
                         }
                     }
                 }
+            }
+            boolean changed=false;
+            int counter=0;
+            while(!changed)
+            {
+                changed=false;
+                counter++;
+                for (Rule aRule: theGrammer)
+                {
+                    for (RuleOutput output:aRule.rightHandSideList)
+                    {
+                        //if the first is a terminal
+                        if ((terminals.get(output.get(0))!=null&&output.get(0).equals(terminals.get(output.get(0))))||output.get(0).equals("@"))
+                        {
+                            if (output.first.get(output.get(0))==null)
+                            {
+                                output.first.put(output.get(0), output.get(0));
+                                changed=true;
+
+                                if (aRule.firsts.get(output.get(0))==null)
+                                {
+                                    aRule.firsts.put(output.get(0), output.get(0));
+
+                                    RuleOutput theTerminal = terminals.get(output.get(0));
+                                    if (theTerminal!=null)
+                                    {
+                                        theTerminal.first.put(output.get(0), output.get(0));
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (!output.first.isEmpty())
+                            {
+                                for (String theseFirsts:output.first.values())
+                                {
+
+                                    if (aRule.firsts.get(theseFirsts)!=null)
+                                    {
+                                        changed=true;
+                                        aRule.firsts.put(theseFirsts, theseFirsts);
+                                        //RuleOutput aTerminal=new RuleOutput();
+                                        //aTerminal.add(aRule.leftHandSide);
+                                        //int toGet = terminalNames.indexOf(aRule.leftHandSide);
+                                        RuleOutput theTerminal = terminals.get(aRule.leftHandSide);
+                                        theTerminal.first.put(theseFirsts, theseFirsts );
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+
+                }
+                System.out.println("Calculating Firsts counter=" + Integer.toString(counter));
             }
 
         }
@@ -491,6 +601,52 @@ public class Main {
         myMain.Stemming();
         System.out.print(myMain.getLanguage());
 
+        myMain.findFirst();
+
+        myMain.printFirsts();
+        System.out.print(myMain.getLanguage());
+
+    }
+
+    public void printFirsts()
+    {
+        System.out.print("nonTerminals [");
+        for (RuleOutput aNonTerminal: nonterminals.values())
+        {
+            System.out.print(aNonTerminal.get(0)+", ");
+        }
+        System.out.print("]\n");
+        System.out.print("\nTerminals [");
+        for (RuleOutput aTerminal: terminals.values())
+        {
+            System.out.print(aTerminal.get(0)+", ");
+        }
+        System.out.print("]\n");
+
+
+
+        System.out.print("\nFirsts \n");
+        for (RuleOutput nonTerminal: nonterminals.values())
+        {
+            System.out.print(nonTerminal.get(0)+" [");
+
+            for (String afirst: nonTerminal.first.values())
+            {
+                System.out.print(afirst+", ");
+            }
+            System.out.print("]\n");
+        }
+        System.out.print("\n Terminal's firsts \n");
+        for (RuleOutput nonTerminal: terminals.values())
+        {
+            System.out.print(nonTerminal.get(0)+" [");
+
+            for (String afirst: nonTerminal.first.values())
+            {
+                System.out.print(afirst+", ");
+            }
+            System.out.print("]\n");
+        }
     }
 
     public void loadFile() {
@@ -535,10 +691,14 @@ public class Main {
 
 
     public class RuleOutput extends ArrayList<String> {
+        HashMap<String, String> first;
+        HashMap<String, String> follows;
+
+        RuleOutput()
+        {
+            follows = new HashMap<String, String>();
+            first= new HashMap<String, String>();
+        }
 
     }
-
-
-
-
 }
